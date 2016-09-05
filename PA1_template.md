@@ -119,14 +119,11 @@ head(intervals)
 ```
 
 ```r
-ggplot(intervals, aes(steps)) + geom_histogram()
-```
-
-```
-## `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+ggplot(intervals, aes(steps)) + geom_histogram(bins = 30)
 ```
 
 ![](PA1_template_files/figure-html/unnamed-chunk-2-1.png)<!-- -->
+
 The number of intervals is 288 which is what we would expect for a full 24 hour day with 5 minute intervals. Looking further I see that the first few intervals have a very small number of steps but a histogram shows that many intervals have a large number of steps and there seem to be two central areas one around 40ish steps and another around 0. This seems very consistent with expected life patters, So I'm going to use the interval mean to replace NAs.
 
 
@@ -135,20 +132,6 @@ activity.nona <- activity %>%
   group_by(interval) %>% 
   mutate(steps = ifelse(is.na(steps), mean(steps, na.rm=TRUE), steps))
 
-activity.nona <- as.data.frame(activity.nona)
-
-daily.nona <- aggregate(steps ~ date, data = activity.nona, sum)
-daily$category <- "original"
-daily.nona$category <- "no-na values"
-daily.plot <-rbind(daily, daily.nona)
-
-g <- ggplot(daily.plot, aes(steps))
-g + geom_histogram(bins = 20) + facet_grid(.~category)
-```
-
-![](PA1_template_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
-
-```r
 any(is.na(activity))
 ```
 
@@ -164,5 +147,49 @@ any(is.na(activity.nona))
 ## [1] FALSE
 ```
 
+```r
+activity.nona <- as.data.frame(activity.nona)
+
+daily.nona <- aggregate(steps ~ date, data = activity.nona, sum)
+daily$category <- "original"
+daily.nona$category <- "no-na values"
+daily.plot <-rbind(daily, daily.nona)
+
+g <- ggplot(daily.plot, aes(steps))
+g + geom_histogram(bins = 20) + facet_grid(.~category)
+```
+
+![](PA1_template_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
+
+As evidenced by the test for NA values and the histogram, we now have a set of data without NAs values, but it retains the same basic distribution of our original data, as shown in the histogram. The non na dataset overall has larger step counts which is what we would expect since we added more data.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+
+```r
+activity.nona$days <- weekdays(as.Date(activity.nona$date))
+
+activity.nona$days <- ifelse(
+  weekdays(as.Date(activity.nona$date)) == "Saturday" |
+  weekdays(as.Date(activity.nona$date)) == "Sunday", 
+  "Weekend", "Weekday")
+
+avgWeekend <- aggregate(steps ~ interval, 
+                data = activity.nona[
+                  activity.nona$days == "Weekend",], mean)
+avgWeekend$category <- "Weekend"
+
+avgWeekday <- aggregate(steps ~ interval, 
+                data = activity.nona[
+                  activity.nona$days == "Weekday",], mean)
+avgWeekday$category <- "Weekday"
+
+avg.plot <- rbind(avgWeekday, avgWeekend)
+
+g <- ggplot(avg.plot, aes(x = interval, y = steps))
+g + geom_line() + facet_grid(category~.)
+```
+
+![](PA1_template_files/figure-html/unnamed-chunk-4-1.png)<!-- -->
+
+From these plots it seems that the participants were less active in the middle of the day during typical work hours. There also seems to be more activity at the begining of the weekdays compared to the weekend data. It seems as though the weekends are more active overall but its difficult to gauge from just this graph.
