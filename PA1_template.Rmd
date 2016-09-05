@@ -1,26 +1,28 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
+author: Jeff Collier
 output: 
   html_document:
     keep_md: true
 ---
 
+```{r global_options, include=F}
+knitr::opts_chunk$set(warning=F)
+require(ggplot2)
+require(dplyr)
+```
 
 ## Loading and preprocessing the data
-Loading the data into a data frame called "activity"
+
+Loading the data into a data frame called "activity". Data is located in a local directory and is unzipped using unz before reading
+
 ```{r Load Data}
 activity <- read.csv(unz("./activity.zip", filename="activity.csv"))
 ```
-
-Process/transform the data  into a format suitable for your analysis
-
-
 ## What is mean total number of steps taken per day?
-For this part of the assignment, I am ignoring the missing values in the dataset.
+In the following histogram, I am ignoring the missing values in the dataset and creating a histogram related to steps/interval. First the daily steps are calculated then the historgram is created
 
-Calculate the total number of steps taken per day
-```{r Steps Histogram, }
-require(ggplot2)
+```{r Steps Daily}
 
 daily <- aggregate(steps ~ date, data = activity, sum)
 
@@ -29,17 +31,65 @@ g + geom_histogram(bins = 20)
 
 ```
 
-Calculate and report the mean and median of the total number of steps taken per day
+The following calculates and report the mean and median of the total number of steps taken per day
+
 ```{r Daily Step Mean}
 mean(daily$steps)
 ```
 
 ## What is the average daily activity pattern?
+```{r Steps Plot, warning=FALSE}
+g <- ggplot(activity, aes(x = interval, y = steps))
+g + geom_line()
 
-
+maxSteps <- activity[!is.na(activity$steps) & activity$steps == max(activity$steps, na.rm = T),]
+maxSteps
+```
 
 ## Imputing missing values
+```{r Missing Values }
+missing <- sum(is.na(activity$steps))
+missing
+percentMissing <- missing / nrow(activity)
+percentMissing
+```
+I manipulated the data a bit to get some basic information about where the NAs might be.
 
+```{r}
+dates <- unique(activity$date)
+length(dates)
+
+dim(daily)
+```
+I find 61 unique dates but only 53 for which I can get a mean number of steps, perhaps because the entire day is NA. Next I attempt to replace NA with the average per time interval rather than per day.
+
+```{r}
+intervals <- aggregate(steps ~ interval, data = activity, mean)
+dim(intervals)
+head(intervals)
+ggplot(intervals, aes(steps)) + geom_histogram()
+```
+The number of intervals is 288 which is what we would expect for a full 24 hour day with 5 minute intervals. Looking further I see that the first few intervals have a very small number of steps but a histogram shows that many intervals have a large number of steps and there seem to be two central areas one around 40ish steps and another around 0. This seems very consistent with expected life patters, So I'm going to use the interval mean to replace NAs.
+
+```{r}
+activity.nona <- activity %>%  
+  group_by(interval) %>% 
+  mutate(steps = ifelse(is.na(steps), mean(steps, na.rm=TRUE), steps))
+
+activity.nona <- as.data.frame(activity.nona)
+
+daily.nona <- aggregate(steps ~ date, data = activity.nona, sum)
+daily$category <- "original"
+daily.nona$category <- "no-na values"
+daily.plot <-rbind(daily, daily.nona)
+
+g <- ggplot(daily.plot, aes(steps))
+g + geom_histogram(bins = 20) + facet_grid(.~category)
+
+any(is.na(activity))
+any(is.na(activity.nona))
+
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
